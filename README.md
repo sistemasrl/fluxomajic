@@ -20,10 +20,17 @@ The output is a new polygonal geometry that follows the shape of the source line
 + Make sure each dependency in the POM is aligned with the Geotools version used in your GeoServer. As an example version 9.0 for GeoServer 2.3:
 
 ```xml
+    ....
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<geoserver-version>9.0</geoserver-version>
+	</properties>
+    ...
 	<dependency>
 		<groupId>org.geotools</groupId>
 		<artifactId>gt-xxx</artifactId>
-		<version>9.0</version>
+		<version>${geoserver-version}</version>
 	</dependency>
 ```
 
