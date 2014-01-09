@@ -1,7 +1,8 @@
 .DS_Store
 
 # Maven Artifacts
-target/
 /.project
 /.classpath
 /.settings
+
+/target

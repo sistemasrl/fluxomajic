@@ -4,7 +4,7 @@
 	<groupId>org.geotools</groupId>
 	<artifactId>fluxo</artifactId>
 	<packaging>jar</packaging>
-	<version>3.0-geoserver.${geoserver}</version>
+	<version>3.0-SNAPSHOT</version>
 	<name>fluxo</name>
 
 	<properties>
