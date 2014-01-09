@@ -2,3 +2,6 @@
 
 # Maven Artifacts
 target/
+/.project
+/.classpath
+/.settings

@@ -15,6 +15,14 @@ The output is a new polygonal geometry that follows the shape of the source line
 
 ![fluxomajic shaped traffic layer](https://raw.github.com/geobeyond/fluxomajic/master/img/fluxomajic.jpg "fluxomajic behavior")
 
+## Versions
+
+Fluxomajic version number is 3.x-geoserver.a.b.c
+
+- 3 is the main version (Fluxomajic comes from a long path...)
+- x is the minor version (bugs and minor improvement)
+- geoserver.a.b.c is the supported version of Geoserver
+
 ## How to build
 
 + Make sure each dependency in the POM is aligned with the Geotools version used in your GeoServer. As an example version 9.0 for GeoServer 2.3:
