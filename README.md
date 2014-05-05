@@ -69,32 +69,39 @@ Fluxomajic adds a function "fluxo" that can be used in SLD. Here is an example o
 ```xml
     <sld:PolygonSymbolizer uom="http://www.opengeospatial.org/se/units/pixel">
     <sld:Geometry>
-      <ogc:Function name="fluxo">
-        <ogc:PropertyName>xxx</ogc:PropertyName>     <!-- Layer's attribute name -->
-        <ogc:Literal>5</ogc:Literal>                 <!-- Offset expressed in pixel -->                  
-        <ogc:Literal>5</ogc:Literal>                 <!-- Width expressed in pixel -->                 
-        <ogc:Literal>1</ogc:Literal>                 <!-- Drive side; 0 = RIGHT(default), 1 = LEFT -->
-        <ogc:Literal>4</ogc:Literal>                 <!-- Number of quandrants; default = 16 -->
-        <ogc:Literal>3</ogc:Literal>                 <!-- ENDCAP style; 1 = ROUND(default), 2 = FLAT, 3 = SQUARE -->
-        <ogc:Literal>1</ogc:Literal>                 <!-- JOIN style; 1 = ROUND(default), 2 = MITRE, 3 = BEVEL -->
-        <ogc:Function name="env">                    <!-- envs (fixed and mandatory) -->
-          <ogc:Literal>wms_crs</ogc:Literal>
+        <ogc:Function name="fluxo">
+            <ogc:PropertyName>xxx</ogc:PropertyName>  <!-- Layer's attribute name -->
+            <ogc:Literal>5</ogc:Literal>              <!-- Offset; expressed in pixel -->
+            <ogc:Literal>5</ogc:Literal>              <!-- Width; expressed in pixel -->
+            <ogc:Literal>1</ogc:Literal>              <!-- Drive side;   0 = RIGHT(default),
+                                                                         1 = LEFT -->
+            <ogc:Literal>4</ogc:Literal>              <!-- Number of quandrants (number of facets
+                                                           into which to divide a fillet of
+                                                           90 degrees);  16(default) -->
+            <ogc:Literal>3</ogc:Literal>              <!-- ENDCAP style; 1 = ROUND(default),
+                                                                         2 = FLAT,
+                                                                         3 = SQUARE -->
+            <ogc:Literal>1</ogc:Literal>              <!-- JOIN style;   1 = ROUND(default),
+                                                                         2 = MITRE,
+                                                                         3 = BEVEL -->
+            <ogc:Function name="env">                 <!-- envs (fixed and mandatory) -->
+                <ogc:Literal>wms_crs</ogc:Literal>
+            </ogc:Function>
+            <ogc:Function name="env">
+                <ogc:Literal>wms_width</ogc:Literal>
+            </ogc:Function>
+            <ogc:Function name="env">
+                <ogc:Literal>wms_height</ogc:Literal>
+            </ogc:Function>
+            <ogc:Function name="env">
+                <ogc:Literal>wms_bbox</ogc:Literal>
+            </ogc:Function>
         </ogc:Function>
-        <ogc:Function name="env">
-          <ogc:Literal>wms_width</ogc:Literal>
-        </ogc:Function>
-        <ogc:Function name="env">
-          <ogc:Literal>wms_height</ogc:Literal>
-        </ogc:Function>
-        <ogc:Function name="env">
-          <ogc:Literal>wms_bbox</ogc:Literal>
-        </ogc:Function>
-      </ogc:Function>
     </sld:Geometry>
     <sld:Fill>
-      <sld:CssParameter name="fill">
-          <ogc:Literal>#33BA2E</ogc:Literal>
-      </sld:CssParameter>
+        <sld:CssParameter name="fill">
+            <ogc:Literal>#33BA2E</ogc:Literal>
+        </sld:CssParameter>
     </sld:Fill>
     </sld:PolygonSymbolizer>
 ```
