@@ -62,6 +62,7 @@ import org.opengis.referencing.operation.TransformException;
 /**
  *
  * @author Francesco Bartoli (Geobeyond)
+ * @author Cristina De Rito (SISTeMA ITS)
  */
 public class FluxoFilterFunction extends FunctionExpressionImpl implements
         GeometryTransformation {
@@ -70,6 +71,8 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
     private static double mitreLimit = 10.0;
     private static int RIGHT = 0;
     private static int LEFT = 1;
+    private static int FIXED = 0;
+    private static int SCALING = 1;
     public static FunctionName NAME = new FunctionNameImpl("fluxo", Geometry.class,
             parameter("geometry", Geometry.class),
             parameter("offset", Double.class),
@@ -78,6 +81,7 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
             parameter("quadseg", Integer.class),
             parameter("endcap", Integer.class),
             parameter("join", Integer.class),
+            parameter("scalingWidth", Integer.class),
             parameter("outputCRS", CoordinateReferenceSystem.class),
             parameter("outputWidth", Integer.class),
             parameter("outputHeight", Integer.class),
@@ -91,11 +95,6 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
         super(NAME);
         setParameters(parameters);
         setFallbackValue(fallback);
-    }
-
-    @Override
-    public int getArgCount() {
-        return 11;
     }
 
     @Override
@@ -156,29 +155,38 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
             } else {
                 join = BufferParameters.JOIN_ROUND;
             }
+            
+            Integer scalingWidth = getExpression(7).evaluate(feature, Integer.class);
+            if(scalingWidth == null) {
+                scalingWidth = SCALING;
+            } else if (scalingWidth == 0) {
+                scalingWidth = FIXED;
+            } else if (scalingWidth == 1) {
+                scalingWidth = SCALING;
+            } else {
+                scalingWidth = SCALING;
+            }
 
-            outCRS = getExpression(7).evaluate(feature, CoordinateReferenceSystem.class);
+            outCRS = getExpression(8).evaluate(feature, CoordinateReferenceSystem.class);
             if (outCRS == null) {
                 outCRS = DefaultGeographicCRS.WGS84;
             }
 
-
-            Integer wmsWidth = getExpression(8).evaluate(feature, Integer.class);
+            Integer wmsWidth = getExpression(9).evaluate(feature, Integer.class);
             if (wmsWidth == null) {
                 wmsWidth = 0;
             }
 
-            Integer wmsHeight = getExpression(9).evaluate(feature, Integer.class);
+            Integer wmsHeight = getExpression(10).evaluate(feature, Integer.class);
             if (wmsHeight == null) {
                 wmsHeight = 0;
             }
 
-
-            outBBox = getExpression(10).evaluate(feature, ReferencedEnvelope.class);
+            outBBox = getExpression(11).evaluate(feature, ReferencedEnvelope.class);
             if (outBBox == null) {
                 outBBox = new ReferencedEnvelope(geom.getEnvelopeInternal().getMinX(), geom.getEnvelopeInternal().getMaxX(), geom.getEnvelopeInternal().getMinY(), geom.getEnvelopeInternal().getMaxY(), (CoordinateReferenceSystem) geom.getUserData());
             }
-
+            
             ReferencedEnvelope tre = null;
             tre = transfEnvelope(outBBox, (CoordinateReferenceSystem) geom.getUserData());
 
@@ -197,12 +205,14 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
             bufferparams.setJoinStyle(join);
             bufferparams.setQuadrantSegments(quadseg);
             bufferparams.setMitreLimit(mitreLimit);
+            
+            double pixelPerMeter = widthPx/widthMt;
 
             Geometry ret = null;
             if (doTravelLeft(dMode)) {
-                ret = bufferWithParams(offsetCurve(geom, -offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit);
+                ret = bufferWithParams(offsetCurve(geom, -offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, pixelPerMeter);
             } else {
-                ret = bufferWithParams(offsetCurve(geom, offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit);
+                ret = bufferWithParams(offsetCurve(geom, offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, pixelPerMeter);
             }
 
             return ret;
@@ -351,10 +361,15 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
      * the buffer is issued at single side then a negative offset renders the
      * shape on the left while a positive offset on the right
      */
-    public static Geometry bufferWithParams(Geometry geometry, Double offset, Boolean singleSided, Integer quadrantSegments, Integer capStyle, Integer joinStyle, Double mitreLimit) {
+    public static Geometry bufferWithParams(Geometry geometry, Double offset, Boolean singleSided, Integer quadrantSegments, Integer capStyle, Integer joinStyle, Double mitreLimit, Integer scalingWidth, double pixelPerMeter) {
         double d = 0.0D;
         if (offset != null) {
-            d = offset.doubleValue();
+            double width = offset.doubleValue();
+            if (scalingWidth == SCALING) {
+                d = width * (width/2) * (Math.sqrt(pixelPerMeter));
+            } else {
+                d = width;
+            }
         }
         Boolean ss = false;
         if (singleSided != null) {

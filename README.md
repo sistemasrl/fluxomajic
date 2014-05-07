@@ -12,6 +12,7 @@ It takes the following input parameters:
 - Number of quadrants
 - ENDCAP style
 - JOIN style
+- Scaling Widht (YES or NO)
 
 The output is a new polygonal geometry that follows the shape of the source linestrings; directly in your WMS request:
 
@@ -84,6 +85,10 @@ Fluxomajic adds a function "fluxo" that can be used in SLD. Here is an example o
             <ogc:Literal>1</ogc:Literal>              <!-- JOIN style;   1 = ROUND(default),
                                                                          2 = MITRE,
                                                                          3 = BEVEL -->
+            <ogc:Literal>1</ogc:Literal>              <!-- Scaling Width (if the width has to scale
+                                                           according to zoom level);
+                                                                         1 = YES(default),
+                                                                         2 = NO -->
             <ogc:Function name="env">                 <!-- envs (fixed and mandatory) -->
                 <ogc:Literal>wms_crs</ogc:Literal>
             </ogc:Function>
