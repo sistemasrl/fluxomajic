@@ -22,8 +22,11 @@
 package org.geotools.filter.function;
 
 import org.geotools.filter.function.FluxoFilterFunction;
+
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 
 import org.geotools.feature.NameImpl;
@@ -34,11 +37,34 @@ import org.opengis.filter.expression.Expression;
 import org.opengis.filter.expression.Function;
 import org.opengis.filter.expression.Literal;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.vividsolutions.jts.geom.Geometry;
+
 public class FluxoFunctionFactory implements FunctionFactory {    
     
     public List<FunctionName> getFunctionNames() {
         List<FunctionName> functionList = new ArrayList<FunctionName>();
-        functionList.add(FluxoFilterFunction.NAME);        
+        functionList.add(FluxoFilterFunction.NAME);
+        //initialize cache
+        FluxoFilterFunction.hash_features=new Hashtable<Request, Geometry>();
+        FluxoFilterFunction.cache_features=CacheBuilder.newBuilder()
+        		.maximumSize(10)
+        		.build(new CacheLoader<Request, Geometry>(){
+					@Override
+					public Geometry load(Request request) throws Exception {
+						return request.getFluxoFilterFunction()
+						        .buildGeometryToReturn(request.getOutBBox(), request.getGeom(), request.getOffsetPx()
+						                , request.getWidthPx(), request.getEndcap(), request.getQuadseg() 
+						                , request.getJoin(), request.getdMode(), request.getScalingWidth()
+						                , request.getWmsWidth(), request.getWmsHeight());
+					}        	
+        });
+        FluxoFilterFunction.cache_width=CacheBuilder.newBuilder()
+                .maximumSize(1000000)
+                .build();
+        
+        functionList.add(FluxoFilterFunctionOld.NAME);        
         return Collections.unmodifiableList( functionList );
     }    
     public Function function(String name, List<Expression> args, Literal fallback) {
@@ -47,6 +73,8 @@ public class FluxoFunctionFactory implements FunctionFactory {
     public Function function(Name name, List<Expression> args, Literal fallback) {
         if( FluxoFilterFunction.NAME.getFunctionName().equals(name)){
             return new FluxoFilterFunction( args, fallback );
+        }else if(FluxoFilterFunctionOld.NAME.getFunctionName().equals(name)){
+            return new FluxoFilterFunctionOld( args, fallback );
         }
         return null; // we do not implement that function
     }
