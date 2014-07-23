@@ -76,28 +76,7 @@ import org.opengis.referencing.operation.TransformException;
 public class FluxoFilterFunction extends FunctionExpressionImpl implements GeometryTransformation {
 
     private static double mitreLimit = 10.0;
-    static LoadingCache<Request, Object> cache_features;
     static Cache<String, Double> cache_width;
-    static HashMap<String, Geometry> hash_features;
-    static Cache<String, Geometry> cache_bufferForOffsetCurves;
-    static HashMap<String, Geometry> hashMap_bufferForOffsetCurves;
-    static LoadingCache<GeometryToBufferize, Geometry> cache_buffer;
-    static WKTWriter wktWriter;
-    static WKBWriter wkbWriter;
-    static WKBReader wkbReader;
-    //debug_sdc
-    private static long time_evaluate_createKey;
-    private static long time_evaluate_queryKey;
-    private static long time_evaluate_getKey;
-    private static long time_addCleanOffsetCurves;
-    private static long time_addCleanOffsetCurves_bufferize;
-    private static long time_addCleanOffsetCurves_boundComputation;
-    private static long time_addCleanOffsetCurves_computeDistance1;
-    private static long time_addCleanOffsetCurves_computeDistance2;
-    private static long time_addCleanOffsetCurves_createLnestring;
-    private static long time_addCleanOffsetCurves_divide;
-    
-
     
     public static FunctionName NAME = new FunctionNameImpl("fluxo", Geometry.class, parameter("geometry", Geometry.class), parameter("offset", Double.class), parameter("width", Double.class), parameter("driveMode", Integer.class), parameter("quadseg", Integer.class), parameter("endcap", Integer.class), parameter("join", Integer.class), parameter("scalingWidth", Integer.class), parameter("outputCRS", CoordinateReferenceSystem.class), parameter("outputWidth", Integer.class), parameter("outputHeight", Integer.class), parameter("outputBBOX", ReferencedEnvelope.class));
 
@@ -111,38 +90,13 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         super(NAME);
         setParameters(parameters);
         setFallbackValue(fallback);
-        //debug_sdc
-        System.out.println("###########################################################");
-        System.out.println("time_evaluate_createKey[ms]: " + time_evaluate_createKey);
-        System.out.println("time_evaluate_queryKey[ms]: " + time_evaluate_queryKey);
-        System.out.println("time_evalueate_getKey[ms]: " + time_evaluate_getKey);
-        System.out.println("time_addCleanOffsetCurves[ms]: " + time_addCleanOffsetCurves);
-        System.out.println("time_addCleanOffsetCurves_bufferize[ms]: " + time_addCleanOffsetCurves_bufferize);
-        System.out.println("time_addCleanOffsetCurves_boundComputation[ms]: " + time_addCleanOffsetCurves_boundComputation);
-        System.out.println("time_addCleanOffsetCurves_computeDistance1[ms]: " + time_addCleanOffsetCurves_computeDistance1);
-        System.out.println("time_addCleanOffsetCurves_computeDistance2[ms]: " + time_addCleanOffsetCurves_computeDistance2);
-        System.out.println("time_addCleanOffsetCurves_createLnestring[ms]: " + time_addCleanOffsetCurves_createLnestring);
-        System.out.println("time_addCleanOffsetCurves_divide[ms]: " + time_addCleanOffsetCurves_divide);
-        time_evaluate_getKey=0;
-        time_evaluate_queryKey=0;
-        time_evaluate_createKey=0;
-        time_addCleanOffsetCurves=0;
-        time_addCleanOffsetCurves_bufferize=0;
-        time_addCleanOffsetCurves_boundComputation=0;
-        time_addCleanOffsetCurves_computeDistance1=0;
-        time_addCleanOffsetCurves_computeDistance2=0;
-        time_addCleanOffsetCurves_createLnestring=0;
-        time_addCleanOffsetCurves_divide=0;
+                
     }
 
     @Override
     public Object evaluate(Object feature) {
 
-        // debug_sdc
-        if (false)
-            return getExpression(0).evaluate(feature, Geometry.class);
         Geometry geom = null;
-        //hash_features.clear();
 
         CoordinateReferenceSystem outCRS = null;
         ReferencedEnvelope outBBox = null;
@@ -171,45 +125,7 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
 
             outBBox = getExpression(11).evaluate(feature, ReferencedEnvelope.class);
 
-            // debug_sdc
-            Geometry ret=null;
-            if(false){
-                //hash_features.clear();
-                Request req=new Request(this, geom, offsetPx,
-                        widthPx, dMode, quadseg, endcap, join, scalingWidth, outCRS,
-                        wmsWidth, wmsHeight, outBBox);
-                
-                //**************************************************************
-                //hash_features.clear();
-                byte[] retWKB=null;
-                long start=System.currentTimeMillis();
-                String key=req.toString();
-                long stop=System.currentTimeMillis();
-                time_evaluate_createKey+=stop-start;
-
-                start=System.currentTimeMillis();
-                boolean allreadyExists=hash_features.containsKey(key);
-                stop=System.currentTimeMillis();
-                time_evaluate_queryKey+=stop-start;
-                if(allreadyExists){
-                    //retWKB =  (byte[]) hash_features.get(key);
-                    //ret=wkbReader.read(retWKB);
-                    start=System.currentTimeMillis();
-                    ret=hash_features.get(key);
-                    stop=System.currentTimeMillis();
-                    time_evaluate_getKey+=stop-start;
-                }else{
-                    ret = buildGeometryToReturn(outBBox, geom, offsetPx, widthPx, endcap, join, quadseg, dMode, scalingWidth, wmsWidth, wmsHeight);
-                    //hash_features.put(key, wkbWriter.write(ret));
-                    hash_features.put(key,ret);
-                }
-                //**************************************************************
-//                ret= new WKBReader().read((byte[]) cache_features.get(req));
-                //**************************************************************
-            }
-            else
-                ret= buildGeometryToReturn(outBBox, geom, offsetPx, widthPx, endcap, join, quadseg, dMode, scalingWidth, wmsWidth, wmsHeight);
-            return ret.clone();
+            return buildGeometryToReturn(outBBox, geom, offsetPx, widthPx, endcap, join, quadseg, dMode, scalingWidth, wmsWidth, wmsHeight);
         }
         catch (Exception ex) {
             Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output CRS:{0}", "" + outCRS);
@@ -265,28 +181,25 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
             pixelPerMeter = getPixelInOneMeter(tre, bbox_width_pixel, bbox_heigth_pixel);
             cache_width.put(bbox_width_crs + ";" + bbox_heigth_crs, pixelPerMeter);
         }
-
+        
         offsetMt = offsetPx / pixelPerMeter;
 
         double widthMt;
-        widthMt = widthPx / pixelPerMeter;// --> save 1 second on entire
-                                          // piemonte
+        widthMt = widthPx / pixelPerMeter;
 
         double offsetCrs = distanceInCrs(offsetMt, geom, (CoordinateReferenceSystem) geom.getUserData());
-        double widthCrs = (offsetCrs / offsetMt) * widthMt;// --> save 1 second
-                                                           // on entire piemonte
+        double widthCrs = (offsetCrs / offsetMt) * widthMt;
 
         BufferParameters bufferparams = new BufferParameters();
-        bufferparams.setSingleSided(true);// metti false qui e inserisci la
-                                          // dichiarazione direttamente nella
-                                          // funzione privata
+        bufferparams.setSingleSided(true);
+
         bufferparams.setEndCapStyle(endcap);
         bufferparams.setJoinStyle(join);
         bufferparams.setQuadrantSegments(quadseg);
         bufferparams.setMitreLimit(mitreLimit);
 
         Geometry ret = null;
-        if (dMode==1) {
+        if (dMode == 1) {
             ret = bufferWithParams(offsetCurve(geom, -offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, pixelPerMeter);
         }
         else {
@@ -304,93 +217,50 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
             geometry = geometry.getBoundary();
         }
 
-        // debug_sdc
-        if (false) {
-            return geometry;
+        Collection<LineString> offsetCurves = new ArrayList<LineString>();
+        if (roughOffsetCurve) {
+            addRoughOffsetCurves(offsetCurves, geometry, parameters, d);
         }
         else {
-            Collection<LineString> offsetCurves = new ArrayList<LineString>();
-            if (roughOffsetCurve) {
-                addRoughOffsetCurves(offsetCurves, geometry, parameters, d);
-            }
-            else {
-                addCleanOffsetCurves(offsetCurves, geometry, parameters, d, qS);
-            }
-            return gf.buildGeometry(offsetCurves);
+            addCleanOffsetCurves(offsetCurves, geometry, parameters, d, qS);
         }
-
+        return gf.buildGeometry(offsetCurves);
     }
 
     private void addCleanOffsetCurves(Collection<LineString> offsetCurves, Geometry sourceCurve, BufferParameters parameters, Double offsetDistance, Integer qS) throws ExecutionException {
 
-        //debug_sdc      
-        long start1,stop1;
-        long start2,stop2;
-        //offsetCurves.clear();
-        start1=System.currentTimeMillis();
         parameters.setSingleSided(true);
         parameters.setQuadrantSegments(qS);
-        start2=System.currentTimeMillis();
-        //cache_bufferForOffsetCurves.invalidateAll();
 
-        Geometry sidedBuffer=null;
-        if(true){
-            sidedBuffer = BufferOp.bufferOp(sourceCurve, offsetDistance, parameters).getBoundary();            
-        }else{
-            String key = offsetDistance + "" + parameters.getEndCapStyle() + "" + parameters.getJoinStyle() + "" + parameters.getMitreLimit() + "" + parameters.getQuadrantSegments() + "" + parameters.isSingleSided() + (new WKTWriter().write(sourceCurve));
-            // sidedBuffer = cache_bufferForOffsetCurves.getIfPresent(key);
-            if (!hashMap_bufferForOffsetCurves.containsKey(key)) {
-                sidedBuffer = BufferOp.bufferOp(sourceCurve, offsetDistance, parameters).getBoundary();
-                hashMap_bufferForOffsetCurves.put(key, sidedBuffer);
-            }
-            else {
-                sidedBuffer = hashMap_bufferForOffsetCurves.get(key);
-            }
-        }
+        Geometry sidedBuffer = BufferOp.bufferOp(sourceCurve, offsetDistance, parameters).getBoundary();
 
-        stop2=System.currentTimeMillis();
-        time_addCleanOffsetCurves_bufferize+=stop2-start2;
         Collection<LineString> offsetSegments = new ArrayList<LineString>();
-        start2=System.currentTimeMillis();
-        double offsetPositiveDistance=Math.abs(offsetDistance);
+        double offsetPositiveDistance = Math.abs(offsetDistance);
         // Segments located entirely under this distance are excluded
-        double lowerBound =  offsetPositiveDistance * Math.sin(Math.PI / (4 * qS));
+        double lowerBound = offsetPositiveDistance * Math.sin(Math.PI / (4 * qS));
         // Segments located entirely over this distance are included
         // note that the theoretical approximation made with quadrantSegments
         // is offset*cos(PI/(4*quadrantSegments) but
         // offset*cos(PI/(2*quadrantSegments)
         // is used to make sure to include segments located on the boundary
         double upperBound = offsetPositiveDistance * Math.cos(Math.PI / (2 * qS));
-        stop2=System.currentTimeMillis();
-        time_addCleanOffsetCurves_boundComputation+=stop2-start2;
         for (int i = 0; i < sidedBuffer.getNumGeometries(); i++) {
             Coordinate[] cc = sidedBuffer.getGeometryN(i).getCoordinates();
             PointPairDistance ppd = new PointPairDistance();
-            //debug_sdc
-            start2=System.currentTimeMillis();
             DistanceToPoint.computeDistance(sourceCurve, cc[0], ppd);
-            stop2=System.currentTimeMillis();
-            time_addCleanOffsetCurves_computeDistance1+=stop2-start2;
-            
+
             double dj = ppd.getDistance();
             for (int j = 1; j < cc.length; j++) {
                 double di = dj;
                 ppd = new PointPairDistance();
-                start2=System.currentTimeMillis();
                 DistanceToPoint.computeDistance(sourceCurve, cc[j], ppd);
-                stop2=System.currentTimeMillis();
-                time_addCleanOffsetCurves_computeDistance2+=stop2-start2;
                 dj = ppd.getDistance();
                 // segment along or touching the source geometry : exclude it
                 if (Math.max(di, dj) < lowerBound || di == 0 || dj == 0) {
                     continue;
                 } // segment along the buffer boundary : include it
                 else if (Math.min(di, dj) > upperBound) {
-                    //debug_sdc
-                    start2=System.currentTimeMillis();
                     LineString segment = sourceCurve.getFactory().createLineString(new Coordinate[] { cc[j - 1], cc[j] });
-                    stop2=System.currentTimeMillis();
-                    time_addCleanOffsetCurves_createLnestring+=stop2-start2;
                     offsetSegments.add(segment);
                 } // segment entirely located inside the buffer : exclude it
                 else if (Math.min(di, dj) > lowerBound && Math.max(di, dj) < upperBound) {
@@ -401,24 +271,18 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
                     // One of the coordinates is closed to but not on the source
                     // curve and the other is more or less closed to offset
                     // distance
-                    //debug_sdc
-                    start2=System.currentTimeMillis();
                     divide(offsetSegments, sourceCurve, cc[j - 1], cc[j], di, dj, lowerBound, upperBound);
-                    stop2=System.currentTimeMillis();
-                    time_addCleanOffsetCurves_divide+=stop2-start2;
                 }
             }
         }
-        
+
         offsetCurves.addAll(merge(offsetSegments));
-        stop1=System.currentTimeMillis();
-        time_addCleanOffsetCurves+=stop1-start1;
     }
 
     /**
-     *  Recursive function to split segments located on the single-side buffer
-     *  boundary, but having a part of them inside the full buffer.
-     */  
+     * Recursive function to split segments located on the single-side buffer
+     * boundary, but having a part of them inside the full buffer.
+     */
     private void divide(Collection<LineString> offsetSegments, Geometry sourceCurve, Coordinate c1, Coordinate c2, double d1, double d2, double lb, double ub) {
 
         // I stop recursion for segment < 2*lb to exclude small segments
@@ -527,6 +391,7 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
      */
     @Override
     public ReferencedEnvelope invert(ReferencedEnvelope renderingEnvelope) {
+
         Envelope bufferedEnvelope = JTS.toGeometry((Envelope) renderingEnvelope).getEnvelopeInternal();
         return new ReferencedEnvelope(bufferedEnvelope, renderingEnvelope.getCoordinateReferenceSystem());
     }
@@ -562,18 +427,6 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         dist = inMeters * (refXY[1] * 0.01) / refY01InMeters;
 
         return dist;
-    }
-
-    private double pixelToMeter(ReferencedEnvelope outputEnv, int outputWidth, int outputHeight, double pixel_distance) {
-
-        double distance_m;
-        double diag_distance_diag;
-        double diag_distance_m;
-
-        diag_distance_diag = Math.sqrt((outputWidth * outputWidth) + (outputHeight * outputHeight));
-        diag_distance_m = getGeodeticSegmentLength(outputEnv.getMinX(), outputEnv.getMinY(), outputEnv.getMaxX(), outputEnv.getMaxY());
-        distance_m = diag_distance_m * pixel_distance / diag_distance_diag;
-        return distance_m;
     }
 
     /**

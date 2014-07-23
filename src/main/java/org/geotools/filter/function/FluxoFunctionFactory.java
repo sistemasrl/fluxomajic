@@ -51,32 +51,10 @@ public class FluxoFunctionFactory implements FunctionFactory {
         List<FunctionName> functionList = new ArrayList<FunctionName>();
         functionList.add(FluxoFilterFunction.NAME);
         //initialize cache
-        FluxoFilterFunction.wktWriter=new WKTWriter();
-        FluxoFilterFunction.wkbReader=new WKBReader();
-        FluxoFilterFunction.wkbWriter=new WKBWriter();
-        FluxoFilterFunction.hash_features=new HashMap<String, Geometry>();
-        FluxoFilterFunction.cache_features=CacheBuilder.newBuilder()
-        		.maximumSize(1000000)
-        		.build(new CacheLoader<Request, Object>(){
-					@Override
-					public Object load(Request request) throws Exception {
-						return new WKBWriter().write(
-						        request.getFluxoFilterFunction()
-						        .buildGeometryToReturn(request.getOutBBox(), request.getGeom(), request.getOffsetPx()
-						                , request.getWidthPx(), request.getEndcap(), request.getQuadseg() 
-						                , request.getJoin(), request.getdMode(), request.getScalingWidth()
-						                , request.getWmsWidth(), request.getWmsHeight()));
-					}        	
-        });
-        FluxoFilterFunction.cache_bufferForOffsetCurves=CacheBuilder.newBuilder()
-                .maximumSize(1000000)
-                .build();
-
         FluxoFilterFunction.cache_width=CacheBuilder.newBuilder()
                 .maximumSize(1000000)
                 .build();
-        FluxoFilterFunction.hashMap_bufferForOffsetCurves=new HashMap<String, Geometry>();
-        
+
         functionList.add(FluxoFilterFunctionOld.NAME);        
         return Collections.unmodifiableList( functionList );
     }    
