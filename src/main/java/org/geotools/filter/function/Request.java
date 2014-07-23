@@ -1,6 +1,3 @@
-/**
- * CacheFeature.java
- */
 package org.geotools.filter.function;
 
 import org.geotools.geometry.jts.ReferencedEnvelope;
