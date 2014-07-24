@@ -168,6 +168,7 @@ public class FluxoFilterFunctionOld extends FunctionExpressionImpl implements
                 outCRS = DefaultGeographicCRS.WGS84;
             }
 
+            
             Integer wmsWidth = getExpression(9).evaluate(feature, Integer.class);
             if (wmsWidth == null) {
                 wmsWidth = 0;
@@ -182,6 +183,8 @@ public class FluxoFilterFunctionOld extends FunctionExpressionImpl implements
             if (outBBox == null) {
                 outBBox = new ReferencedEnvelope(geom.getEnvelopeInternal().getMinX(), geom.getEnvelopeInternal().getMaxX(), geom.getEnvelopeInternal().getMinY(), geom.getEnvelopeInternal().getMaxY(), (CoordinateReferenceSystem) geom.getUserData());
             }
+            
+           
             
             ReferencedEnvelope tre = null;
             tre = transfEnvelope(outBBox, (CoordinateReferenceSystem) geom.getUserData());

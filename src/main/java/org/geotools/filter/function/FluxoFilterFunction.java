@@ -21,8 +21,6 @@
 
 package org.geotools.filter.function;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.LoadingCache;
 import com.vividsolutions.jts.algorithm.distance.DistanceToPoint;
 import com.vividsolutions.jts.algorithm.distance.PointPairDistance;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -37,12 +35,7 @@ import org.opengis.filter.capability.FunctionName;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geomgraph.Position;
-import com.vividsolutions.jts.io.WKBReader;
-import com.vividsolutions.jts.io.WKBWriter;
-import com.vividsolutions.jts.io.WKTReader;
-import com.vividsolutions.jts.io.WKTWriter;
 import com.vividsolutions.jts.operation.buffer.BufferOp;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
@@ -50,10 +43,7 @@ import com.vividsolutions.jts.operation.linemerge.LineMerger;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -61,12 +51,14 @@ import java.util.logging.Logger;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.GeodeticCalculator;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.opengis.filter.expression.Expression;
 import org.opengis.filter.expression.Literal;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
 
 /**
@@ -75,9 +67,12 @@ import org.opengis.referencing.operation.TransformException;
  */
 public class FluxoFilterFunction extends FunctionExpressionImpl implements GeometryTransformation {
 
+    public final static double radiantsOfOneDegree = 0.01745329251994;// PiGreek/180
+    public final static double earthRadiusMeters = 6371005.076123;// earth
+                                                                  // radius (m)
+
     private static double mitreLimit = 10.0;
-    static Cache<String, Double> cache_width;
-    
+
     public static FunctionName NAME = new FunctionNameImpl("fluxo", Geometry.class, parameter("geometry", Geometry.class), parameter("offset", Double.class), parameter("width", Double.class), parameter("driveMode", Integer.class), parameter("quadseg", Integer.class), parameter("endcap", Integer.class), parameter("join", Integer.class), parameter("scalingWidth", Integer.class), parameter("outputCRS", CoordinateReferenceSystem.class), parameter("outputWidth", Integer.class), parameter("outputHeight", Integer.class), parameter("outputBBOX", ReferencedEnvelope.class));
 
     public FluxoFilterFunction() {
@@ -90,12 +85,12 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         super(NAME);
         setParameters(parameters);
         setFallbackValue(fallback);
-                
+
     }
 
     @Override
     public Object evaluate(Object feature) {
-
+       
         Geometry geom = null;
 
         CoordinateReferenceSystem outCRS = null;
@@ -125,18 +120,25 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
 
             outBBox = getExpression(11).evaluate(feature, ReferencedEnvelope.class);
 
+            //debug_sdc
+//            Geometry tmp_ret=TestGeodetic.getGeodeticLineBuf(geom, widthPx);
+//            return tmp_ret;
             return buildGeometryToReturn(outBBox, geom, offsetPx, widthPx, endcap, join, quadseg, dMode, scalingWidth, wmsWidth, wmsHeight);
         }
         catch (Exception ex) {
-            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output CRS:{0}", "" + outCRS);
-            if (outCRS != null && outCRS.getCoordinateSystem() != null && outCRS.getCoordinateSystem().getIdentifiers() != null) {
-                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "SRS identifier of the output coordinate system:{0}", outCRS.getCoordinateSystem().getIdentifiers().toString());
+            //debug_sdc
+            if(true){
+                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output CRS:{0}", "" + outCRS);
+                if (outCRS != null && outCRS.getCoordinateSystem() != null && outCRS.getCoordinateSystem().getIdentifiers() != null) {
+                    Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "SRS identifier of the output coordinate system:{0}", outCRS.getCoordinateSystem().getIdentifiers().toString());
+                }
+                if (geom != null && geom.getUserData() != null) {
+                    Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "CRS value read by the geometry of the db:{0}", ((CoordinateReferenceSystem) geom.getUserData()).toString());
+                }
+                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output Boundind Box:{0}", "" + outBBox);
+                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.SEVERE, null, ex);
+                
             }
-            if (geom != null && geom.getUserData() != null) {
-                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "CRS value read by the geometry of the db:{0}", ((CoordinateReferenceSystem) geom.getUserData()).toString());
-            }
-            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output Boundind Box:{0}", "" + outBBox);
-            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.SEVERE, null, ex);
         }
         return geom;
 
@@ -164,32 +166,48 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
      */
     Geometry buildGeometryToReturn(ReferencedEnvelope outBBox, Geometry geom, double offsetPx, double widthPx, int endcap, int join, int quadseg, int dMode, int scalingWidth, int bbox_width_pixel, int bbox_heigth_pixel) throws TransformException, FactoryException, ExecutionException {
 
-        ReferencedEnvelope tre = null;
-        // Run a CRS transformation if necessary
-        if (outBBox.getCoordinateReferenceSystem().equals(geom.getUserData()))
-            tre = outBBox;
-        else
-            tre = transfEnvelope(outBBox, (CoordinateReferenceSystem) geom.getUserData());
+//      ReferencedEnvelope tre = null;
+//        // Run a CRS transformation if necessary
+//        if (outBBox.getCoordinateReferenceSystem().equals(geom.getUserData()))
+//            tre = outBBox;
+//        else
+//            tre = transfEnvelope(outBBox, (CoordinateReferenceSystem) geom.getUserData());
 
-        double offsetMt;
-        Double pixelPerMeter;
+        MathTransform transform = null;
+        transform = CRS.findMathTransform((CoordinateReferenceSystem) geom.getUserData(),outBBox.getCoordinateReferenceSystem());
+        Geometry newGeom=JTS.transform(geom, transform);
+        newGeom.setUserData(outBBox.getCoordinateReferenceSystem());
 
-        double bbox_width_crs = tre.getWidth();
-        double bbox_heigth_crs = tre.getHeight();
-        pixelPerMeter = cache_width.getIfPresent(bbox_width_crs + ";" + bbox_heigth_crs);
-        if (pixelPerMeter == null) {
-            pixelPerMeter = getPixelInOneMeter(tre, bbox_width_pixel, bbox_heigth_pixel);
-            cache_width.put(bbox_width_crs + ";" + bbox_heigth_crs, pixelPerMeter);
-        }
         
-        offsetMt = offsetPx / pixelPerMeter;
+        Double crsUnitPerPixel = null;
 
-        double widthMt;
-        widthMt = widthPx / pixelPerMeter;
+        double bbox_width_crs = outBBox.getWidth();
+        double bbox_heigth_crs = outBBox.getHeight();
+        if (FluxoFunctionFactory.useCache)
+            crsUnitPerPixel = FluxoFunctionFactory.cache_width.getIfPresent(bbox_width_crs + ";" + bbox_heigth_crs);
+        if (crsUnitPerPixel == null) {
+            crsUnitPerPixel = getCRSUnitInOnePixel(outBBox, bbox_width_pixel, bbox_heigth_pixel);
+            FluxoFunctionFactory.cache_width.put(bbox_width_crs + ";" + bbox_heigth_crs, crsUnitPerPixel);
+        }
 
-        double offsetCrs = distanceInCrs(offsetMt, geom, (CoordinateReferenceSystem) geom.getUserData());
-        double widthCrs = (offsetCrs / offsetMt) * widthMt;
+        double offsetCrs = offsetPx * crsUnitPerPixel;
 
+        //double widthMt;
+        double widthCrs= widthPx * crsUnitPerPixel;
+        
+//        double offsetCrs=0;
+//        double widthCrs =0;
+//        if(offsetPx>0){
+//            offsetCrs = distanceInCrs(offsetMt, geom, (CoordinateReferenceSystem) geom.getUserData());
+//            if(widthPx>0)
+//                widthCrs = (offsetCrs / offsetMt) * widthMt;
+//            double CRSPerPixel = offsetCrs / offsetPx;
+//        }else {
+//            if(widthPx>0)
+//                widthCrs = distanceInCrs(widthMt, geom, (CoordinateReferenceSystem) geom.getUserData());         
+//        }
+//        
+        
         BufferParameters bufferparams = new BufferParameters();
         bufferparams.setSingleSided(true);
 
@@ -200,17 +218,24 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
 
         Geometry ret = null;
         if (dMode == 1) {
-            ret = bufferWithParams(offsetCurve(geom, -offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, pixelPerMeter);
+            ret = bufferWithParams(offsetCurve(newGeom, -offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, crsUnitPerPixel);
         }
         else {
-            ret = bufferWithParams(offsetCurve(geom, offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, pixelPerMeter);
+            ret = bufferWithParams(offsetCurve(newGeom, offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, crsUnitPerPixel);
         }
 
-        return ret;
+        transform = CRS.findMathTransform((CoordinateReferenceSystem) newGeom.getUserData(),(CoordinateReferenceSystem) geom.getUserData());
+        Geometry reverseRet=JTS.transform(ret, transform);
+        reverseRet.setUserData( geom.getUserData());
+
+        
+        return reverseRet;
     }
 
     private Geometry offsetCurve(Geometry geometry, double d, BufferParameters parameters, Boolean roughOffsetCurve, Integer qS) throws ExecutionException {
 
+        if(d==0) return (Geometry) geometry.clone();
+        
         GeometryFactory gf = geometry.getFactory();
         // If "geometry" is a surface, process its boundary
         if (geometry.getDimension() == 2) {
@@ -346,27 +371,23 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
      * the buffer is issued at single side then a negative offset renders the
      * shape on the left while a positive offset on the right
      */
-    public static Geometry bufferWithParams(Geometry geometry, Double offset, Boolean singleSided, Integer quadrantSegments, Integer capStyle, Integer joinStyle, Double mitreLimit, Integer scalingWidth, double pixelPerMeter) {
+    public static Geometry bufferWithParams(Geometry geometry, Double offset, boolean singleSided, Integer quadrantSegments, Integer capStyle, Integer joinStyle, Double mitreLimit, Integer scalingWidth, double meterPerPixel) {
 
-        double d = 0.0D;
+        double widthCRS = 0;
         if (offset != null) {
-            double width = offset;
             if (scalingWidth == 1) {
-                d = width * (width / 2) * (Math.sqrt(pixelPerMeter));
+                // TODO
+
             }
             else {
-                d = width;
+                widthCRS = offset;
             }
-        }
-        Boolean ss = false;
-        if (singleSided != null) {
-            ss = singleSided;
         }
 
         BufferParameters bufferparameters = new BufferParameters();
 
         // Custom code to be able to draw only on the side of the offset curve
-        bufferparameters.setSingleSided(ss);
+        bufferparameters.setSingleSided(singleSided);
 
         if (quadrantSegments != null) {
             bufferparameters.setQuadrantSegments(quadrantSegments.intValue());
@@ -380,8 +401,8 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         if (mitreLimit != null) {
             bufferparameters.setMitreLimit(mitreLimit.doubleValue());
         }
-
-        return BufferOp.bufferOp(geometry, d, bufferparameters);
+        
+        return BufferOp.bufferOp(geometry, widthCRS, bufferparameters);
     }
 
     /**
@@ -408,7 +429,7 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         return 0d;
     }
 
-    private double distanceInCrs(double inMeters, double[] refXY, CoordinateReferenceSystem crs) throws TransformException {
+    private double distanceInCrs(double distanceInMeters, double[] refXY, CoordinateReferenceSystem crs) throws TransformException {
 
         double dist = 0;
 
@@ -424,7 +445,7 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         double refY01InMeters = gc.getOrthodromicDistance();
 
         // now, calculate the CRS distance as a proportional of 0.01 * refY
-        dist = inMeters * (refXY[1] * 0.01) / refY01InMeters;
+        dist = distanceInMeters * (refXY[1] * 0.01) / refY01InMeters;
 
         return dist;
     }
@@ -436,11 +457,30 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
      * @param bbox_heigth_pixel
      * @return
      */
-    private double getPixelInOneMeter(ReferencedEnvelope bbox_crs, int bbox_width_pixel, int bbox_heigth_pixel) {
+    private double getCRSUnitInOnePixel(ReferencedEnvelope bbox_crs, int bbox_width_pixel, int bbox_heigth_pixel) {
 
         double diag_distance_pixel = Math.sqrt((bbox_width_pixel * bbox_width_pixel) + (bbox_heigth_pixel * bbox_heigth_pixel));
-        double diag_distance_m = getGeodeticSegmentLength(bbox_crs.getMinX(), bbox_crs.getMinY(), bbox_crs.getMaxX(), bbox_crs.getMaxY());
-        return diag_distance_pixel / diag_distance_m;
+        //double diag_distance_m = getGeodeticSegmentLength(bbox_crs.getMinX(), bbox_crs.getMinY(), bbox_crs.getMaxX(), bbox_crs.getMaxY());
+        double diag_distance_CRS = Math.sqrt((bbox_crs.getWidth() * bbox_crs.getWidth()) + (bbox_crs.getHeight() * bbox_crs.getHeight()));
+
+        return diag_distance_CRS / diag_distance_pixel;
+    }
+
+    /**
+     * Compute the distance in meters between the two specified points
+     * 
+     * @param x1
+     * @param y1
+     * @param x2
+     * @param y2
+     * @return
+     */
+    private static double getDistance(double x1, double y1, double x2, double y2) {
+
+        double xFactor = Math.cos(y1) * radiantsOfOneDegree;
+        double leng = Math.sqrt((x1 - x2) * xFactor * (x1 - x2) * xFactor + (y1 - y2) * (y1 - y2));
+        leng = leng * radiantsOfOneDegree * earthRadiusMeters;
+        return leng;
     }
 
     private static double getGeodeticSegmentLength(double minx, double miny, double maxx, double maxy) {

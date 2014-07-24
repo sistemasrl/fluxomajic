@@ -37,6 +37,7 @@ import org.opengis.filter.expression.Expression;
 import org.opengis.filter.expression.Function;
 import org.opengis.filter.expression.Literal;
 
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.vividsolutions.jts.geom.Geometry;
@@ -45,27 +46,40 @@ import com.vividsolutions.jts.io.WKBWriter;
 import com.vividsolutions.jts.io.WKTWriter;
 import com.vividsolutions.jts.operation.buffer.BufferOp;
 
-public class FluxoFunctionFactory implements FunctionFactory {    
+public class FluxoFunctionFactory implements FunctionFactory {
+
+    static Cache<String, Double> cache_width;
+    //debug_sdc
+    static boolean useCache=false;
+
     
     public List<FunctionName> getFunctionNames() {
+
         List<FunctionName> functionList = new ArrayList<FunctionName>();
         functionList.add(FluxoFilterFunction.NAME);
-        //initialize cache
-        FluxoFilterFunction.cache_width=CacheBuilder.newBuilder()
-                .maximumSize(1000000)
-                .build();
+        // initialize cache
+        cache_width = CacheBuilder.newBuilder().maximumSize(1000000).build();
 
-        functionList.add(FluxoFilterFunctionOld.NAME);        
-        return Collections.unmodifiableList( functionList );
-    }    
+        functionList.add(FluxoFilterFunctionOld.NAME);
+        functionList.add(FluxoFilterFunction_noGeoc.NAME);
+        return Collections.unmodifiableList(functionList);
+    }
+
     public Function function(String name, List<Expression> args, Literal fallback) {
+
         return function(new NameImpl(name), args, fallback);
     }
+
     public Function function(Name name, List<Expression> args, Literal fallback) {
-        if( FluxoFilterFunction.NAME.getFunctionName().equals(name)){
-            return new FluxoFilterFunction( args, fallback );
-        }else if(FluxoFilterFunctionOld.NAME.getFunctionName().equals(name)){
-            return new FluxoFilterFunctionOld( args, fallback );
+
+        if (FluxoFilterFunction.NAME.getFunctionName().equals(name)) {
+            return new FluxoFilterFunction(args, fallback);
+        }
+        else if (FluxoFilterFunctionOld.NAME.getFunctionName().equals(name)) {
+            return new FluxoFilterFunctionOld(args, fallback);
+        }
+        else if (FluxoFilterFunction_noGeoc.NAME.getFunctionName().equals(name)) {
+            return new FluxoFilterFunction_noGeoc(args, fallback);
         }
         return null; // we do not implement that function
     }
