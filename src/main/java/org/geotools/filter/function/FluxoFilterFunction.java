@@ -235,6 +235,15 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
             // ycoo2)});
         }
 
+        if (scalingWidth == 1) {
+            double unitPerPixel=crsUnitPerPixel;
+            if(outBBox.getCoordinateReferenceSystem().getCoordinateSystem().getAxis(0).getUnit().getStandardUnit().toString().equals("rad")){
+                unitPerPixel=crsUnitPerPixel*earthRadiusMeters;
+            }
+            double multiplier=Math.pow(10/unitPerPixel,1.0/12);
+            widthPx=widthPx*multiplier;
+        }
+        
         double offsetCrs = offsetPx * crsUnitPerPixel;
         double widthCrs = widthPx * crsUnitPerPixel;
 
@@ -250,11 +259,6 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         }
 
         // Buffer
-        if (scalingWidth == 1) {
-            // TODO
-
-        }
-
         bufferParameters.setSingleSided(false);
         Geometry geom_buffered = BufferOp.bufferOp(geom_offseted, widthCrs, bufferParameters);
 
