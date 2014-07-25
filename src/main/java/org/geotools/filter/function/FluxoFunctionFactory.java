@@ -49,7 +49,6 @@ import com.vividsolutions.jts.operation.buffer.BufferOp;
 public class FluxoFunctionFactory implements FunctionFactory {
 
     static Cache<String, Double> cache_width;
-    //debug_sdc
     static boolean useCache=false;
 
     
@@ -60,8 +59,6 @@ public class FluxoFunctionFactory implements FunctionFactory {
         // initialize cache
         cache_width = CacheBuilder.newBuilder().maximumSize(1000000).build();
 
-        functionList.add(FluxoFilterFunctionOld.NAME);
-        functionList.add(FluxoFilterFunction_noGeoc.NAME);
         return Collections.unmodifiableList(functionList);
     }
 
@@ -74,12 +71,6 @@ public class FluxoFunctionFactory implements FunctionFactory {
 
         if (FluxoFilterFunction.NAME.getFunctionName().equals(name)) {
             return new FluxoFilterFunction(args, fallback);
-        }
-        else if (FluxoFilterFunctionOld.NAME.getFunctionName().equals(name)) {
-            return new FluxoFilterFunctionOld(args, fallback);
-        }
-        else if (FluxoFilterFunction_noGeoc.NAME.getFunctionName().equals(name)) {
-            return new FluxoFilterFunction_noGeoc(args, fallback);
         }
         return null; // we do not implement that function
     }
