@@ -157,4 +157,4 @@ where:
 + Wi = input width
 + Or = offset to use for the geotools buffer function
 + Wr = width to use for the geotools buffer function  
-![fluxomajic workflow](https://raw.github.com/geobeyond/fluxomajic/master/img/workflow.png "getools buffer behavior")
+![fluxomajic workflow](https://github.com/sdecri/fluxomajic/master/img/workflow.png "getools buffer behavior")
