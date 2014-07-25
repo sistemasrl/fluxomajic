@@ -145,3 +145,16 @@ Fluxomajic adds a function "fluxo" that can be used in SLD. Here is an example o
 + Build using Maven both fluxo and gs-web-app modules.
 
 + As a confirmation, if you are using Eclipse, check in the gs-web-app properties whether fluxo is among the dependencies.
+
+## Geotools buffer behavior
+
+Since the geotools buffer function not consider end cap in case of single side buffer, is necessary to run a buffer on both shape size.
+But in this way the width is double (respect to the input parameter), so is necessary to internally correct the two parameters offset and width in the following way:
++ Or = Oi + 0.5Wi
++ Wr = Wi/2
+where:
++ Oi = input offset
++ Wi = input width
++ Or = offset to use for the geotools buffer function
++ Wr = width to use for the geotools buffer function  
+![fluxomajic workflow](https://raw.github.com/geobeyond/fluxomajic/master/img/workflow.png "getools buffer behavior")
