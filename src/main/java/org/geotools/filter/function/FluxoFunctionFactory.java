@@ -22,8 +22,11 @@
 package org.geotools.filter.function;
 
 import org.geotools.filter.function.FluxoFilterFunction;
+
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 
 import org.geotools.feature.NameImpl;
@@ -34,19 +37,40 @@ import org.opengis.filter.expression.Expression;
 import org.opengis.filter.expression.Function;
 import org.opengis.filter.expression.Literal;
 
-public class FluxoFunctionFactory implements FunctionFactory {    
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.io.WKBReader;
+import com.vividsolutions.jts.io.WKBWriter;
+import com.vividsolutions.jts.io.WKTWriter;
+import com.vividsolutions.jts.operation.buffer.BufferOp;
+
+public class FluxoFunctionFactory implements FunctionFactory {
+
+    static Cache<String, Double> cache_width;
+    static boolean useCache=false;
+
     
     public List<FunctionName> getFunctionNames() {
+
         List<FunctionName> functionList = new ArrayList<FunctionName>();
-        functionList.add(FluxoFilterFunction.NAME);        
-        return Collections.unmodifiableList( functionList );
-    }    
+        functionList.add(FluxoFilterFunction.NAME);
+        // initialize cache
+        cache_width = CacheBuilder.newBuilder().maximumSize(1000000).build();
+
+        return Collections.unmodifiableList(functionList);
+    }
+
     public Function function(String name, List<Expression> args, Literal fallback) {
+
         return function(new NameImpl(name), args, fallback);
     }
+
     public Function function(Name name, List<Expression> args, Literal fallback) {
-        if( FluxoFilterFunction.NAME.getFunctionName().equals(name)){
-            return new FluxoFilterFunction( args, fallback );
+
+        if (FluxoFilterFunction.NAME.getFunctionName().equals(name)) {
+            return new FluxoFilterFunction(args, fallback);
         }
         return null; // we do not implement that function
     }

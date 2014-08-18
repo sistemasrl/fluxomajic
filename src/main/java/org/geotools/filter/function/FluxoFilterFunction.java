@@ -17,7 +17,7 @@
  *   Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *   
  *
- */ 
+ */
 
 package org.geotools.filter.function;
 
@@ -25,10 +25,14 @@ import com.vividsolutions.jts.algorithm.distance.DistanceToPoint;
 import com.vividsolutions.jts.algorithm.distance.PointPairDistance;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
+
 import static org.geotools.filter.capability.FunctionNameImpl.*;
+
 import org.geotools.filter.FunctionExpressionImpl;
 import org.geotools.filter.capability.FunctionNameImpl;
 import org.opengis.filter.capability.FunctionName;
+
+import com.vividsolutions.jts.geom.CoordinateSequence;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LineString;
@@ -37,267 +41,314 @@ import com.vividsolutions.jts.operation.buffer.BufferOp;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
 import com.vividsolutions.jts.operation.linemerge.LineMerger;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.geotools.factory.Hints;
+
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.GeodeticCalculator;
-import org.geotools.referencing.ReferencingFactoryFinder;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.opengis.filter.expression.Expression;
 import org.opengis.filter.expression.Literal;
 import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.NoSuchAuthorityCodeException;
-import org.opengis.referencing.crs.CRSAuthorityFactory;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
 
 /**
- *
- * @author Francesco Bartoli (Geobeyond)
- * @author Cristina De Rito (SISTeMA ITS)
+ * @see <a
+ *      href="http://docs.geotools.org/stable/userguide/tutorial/factory.html">http://docs.geotools.org/stable/userguide/tutorial/factory.html</a>
  */
-public class FluxoFilterFunction extends FunctionExpressionImpl implements
-        GeometryTransformation {
+public class FluxoFilterFunction extends FunctionExpressionImpl implements GeometryTransformation {
 
-    private static int quadrantSegments = 16;
+    public final static double radiantsOfOneDegree = 0.01745329251994;// PiGreek/180
+    public final static double earthRadiusMeters = 6371005.076123;// earth
+                                                                  // radius (m)
+
     private static double mitreLimit = 10.0;
-    private static int RIGHT = 0;
-    private static int LEFT = 1;
-    private static int FIXED = 0;
-    private static int SCALING = 1;
-    public static FunctionName NAME = new FunctionNameImpl("fluxo", Geometry.class,
-            parameter("geometry", Geometry.class),
-            parameter("offset", Double.class),
-            parameter("width", Double.class),
-            parameter("driveMode", Integer.class),
-            parameter("quadseg", Integer.class),
-            parameter("endcap", Integer.class),
-            parameter("join", Integer.class),
-            parameter("scalingWidth", Integer.class),
-            parameter("outputCRS", CoordinateReferenceSystem.class),
-            parameter("outputWidth", Integer.class),
-            parameter("outputHeight", Integer.class),
-            parameter("outputBBOX", ReferencedEnvelope.class));
+
+    public static FunctionName NAME = new FunctionNameImpl("fluxo", Geometry.class, parameter("geometry", Geometry.class), parameter("offset", Double.class), parameter("width", Double.class), parameter("driveMode", Integer.class), parameter("quadseg", Integer.class), parameter("endcap", Integer.class), parameter("join", Integer.class), parameter("scalingWidth", Integer.class), parameter("maxPixelLengthToDraw", Integer.class), parameter("outputCRS", CoordinateReferenceSystem.class), parameter("outputWidth", Integer.class), parameter("outputHeight", Integer.class), parameter("outputBBOX", ReferencedEnvelope.class));
 
     public FluxoFilterFunction() {
+
         super(NAME);
     }
 
     public FluxoFilterFunction(List<Expression> parameters, Literal fallback) {
+
         super(NAME);
         setParameters(parameters);
         setFallbackValue(fallback);
+
     }
 
     @Override
     public Object evaluate(Object feature) {
+
         Geometry geom = null;
+
         CoordinateReferenceSystem outCRS = null;
         ReferencedEnvelope outBBox = null;
         try {
             geom = getExpression(0).evaluate(feature, Geometry.class);
 
             Double offsetPx = getExpression(1).evaluate(feature, Double.class);
-            if (offsetPx == null) {
-                offsetPx = 0d;
-            } else {
-                offsetPx = Math.abs(offsetPx);
-            }
+
             Double widthPx = getExpression(2).evaluate(feature, Double.class);
-            if (widthPx == null) {
-                widthPx = 0d;
-            } else {
-                widthPx = Math.abs(widthPx);
-            }
 
             Integer dMode = getExpression(3).evaluate(feature, Integer.class);
-            if (dMode == null) {
-                dMode = RIGHT;
-            } else if (dMode == 0) {
-                dMode = RIGHT;
-            } else if (dMode == 1) {
-                dMode = LEFT;
-            } else {
-                dMode = RIGHT;
-            }
 
             Integer quadseg = getExpression(4).evaluate(feature, Integer.class);
-            if (quadseg == null) {
-                quadseg = quadrantSegments;
-            }
 
             Integer endcap = getExpression(5).evaluate(feature, Integer.class);
-            if (endcap == null) {
-                endcap = BufferParameters.CAP_ROUND;
-            } else if (endcap == 2) {
-                endcap = BufferParameters.CAP_FLAT;
-            } else if (endcap == 3) {
-                endcap = BufferParameters.CAP_SQUARE;
-            } else {
-                endcap = BufferParameters.CAP_ROUND;
-            }
 
             Integer join = getExpression(6).evaluate(feature, Integer.class);
-            if (join == null) {
-                join = BufferParameters.JOIN_ROUND;
-            } else if (join == 2) {
-                join = BufferParameters.JOIN_MITRE;
-            } else if (join == 3) {
-                join = BufferParameters.JOIN_BEVEL;
-            } else {
-                join = BufferParameters.JOIN_ROUND;
-            }
-            
+
             Integer scalingWidth = getExpression(7).evaluate(feature, Integer.class);
-            if(scalingWidth == null) {
-                scalingWidth = SCALING;
-            } else if (scalingWidth == 0) {
-                scalingWidth = FIXED;
-            } else if (scalingWidth == 1) {
-                scalingWidth = SCALING;
-            } else {
-                scalingWidth = SCALING;
+
+            int maxPixelLengthToDraw = 3;// getExpression(8).evaluate(feature,
+                                         // Integer.class);
+
+            outCRS = getExpression(9).evaluate(feature, CoordinateReferenceSystem.class);
+
+            Integer wmsWidth = getExpression(10).evaluate(feature, Integer.class);
+
+            Integer wmsHeight = getExpression(11).evaluate(feature, Integer.class);
+
+            outBBox = getExpression(12).evaluate(feature, ReferencedEnvelope.class);
+
+            BufferParameters bufferParameters = new BufferParameters();
+            bufferParameters.setSingleSided(true);
+            bufferParameters.setEndCapStyle(endcap);
+            bufferParameters.setJoinStyle(join);
+            bufferParameters.setQuadrantSegments(quadseg);
+            bufferParameters.setMitreLimit(mitreLimit);
+
+            // Update offset and width in order to respect the input values.
+            // Indeed to drawn a correct feature is necessary to run a
+            // both-sided buffer
+            // that doubled the current width
+            widthPx = widthPx / 2;
+            offsetPx += widthPx;
+
+            return buildGeometryToReturn(outBBox, geom, offsetPx, widthPx, bufferParameters, maxPixelLengthToDraw, dMode, scalingWidth, wmsWidth, wmsHeight);
+        }
+        catch (Exception ex) {
+            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output CRS:{0}", "" + outCRS);
+            if (outCRS != null && outCRS.getCoordinateSystem() != null && outCRS.getCoordinateSystem().getIdentifiers() != null) {
+                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "SRS identifier of the output coordinate system:{0}", outCRS.getCoordinateSystem().getIdentifiers().toString());
             }
-
-            outCRS = getExpression(8).evaluate(feature, CoordinateReferenceSystem.class);
-            if (outCRS == null) {
-                outCRS = DefaultGeographicCRS.WGS84;
+            if (geom != null && geom.getUserData() != null) {
+                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "CRS value read by the geometry of the db:{0}", ((CoordinateReferenceSystem) geom.getUserData()).toString());
             }
-
-            Integer wmsWidth = getExpression(9).evaluate(feature, Integer.class);
-            if (wmsWidth == null) {
-                wmsWidth = 0;
-            }
-
-            Integer wmsHeight = getExpression(10).evaluate(feature, Integer.class);
-            if (wmsHeight == null) {
-                wmsHeight = 0;
-            }
-
-            outBBox = getExpression(11).evaluate(feature, ReferencedEnvelope.class);
-            if (outBBox == null) {
-                outBBox = new ReferencedEnvelope(geom.getEnvelopeInternal().getMinX(), geom.getEnvelopeInternal().getMaxX(), geom.getEnvelopeInternal().getMinY(), geom.getEnvelopeInternal().getMaxY(), (CoordinateReferenceSystem) geom.getUserData());
-            }
-            
-            ReferencedEnvelope tre = null;
-            tre = transfEnvelope(outBBox, (CoordinateReferenceSystem) geom.getUserData());
-
-            double offsetMt;
-            offsetMt = pixelToMeter(tre, wmsWidth, wmsHeight, offsetPx);
-
-            double widthMt;
-            widthMt = pixelToMeter(tre, wmsWidth, wmsHeight, widthPx);
-
-            double offsetCrs = distanceInCrs(offsetMt, geom, (CoordinateReferenceSystem) geom.getUserData());
-            double widthCrs = distanceInCrs(widthMt, geom, (CoordinateReferenceSystem) geom.getUserData());
-
-            BufferParameters bufferparams = new BufferParameters();
-            bufferparams.setSingleSided(true);//metti false qui e inserisci la dichiarazione direttamente nella funzione privata
-            bufferparams.setEndCapStyle(endcap);
-            bufferparams.setJoinStyle(join);
-            bufferparams.setQuadrantSegments(quadseg);
-            bufferparams.setMitreLimit(mitreLimit);
-            
-            double pixelPerMeter = widthPx/widthMt;
-
-            Geometry ret = null;
-            if (doTravelLeft(dMode)) {
-                ret = bufferWithParams(offsetCurve(geom, -offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, pixelPerMeter);
-            } else {
-                ret = bufferWithParams(offsetCurve(geom, offsetCrs, bufferparams, false, bufferparams.getQuadrantSegments()), widthCrs, false, bufferparams.getQuadrantSegments(), endcap, join, mitreLimit, scalingWidth, pixelPerMeter);
-            }
-
-            return ret;
-
-        } catch (Exception ex) {
-            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output CRS:{0}", ""+outCRS);
-            if (outCRS!=null && outCRS.getCoordinateSystem()!=null && outCRS.getCoordinateSystem().getIdentifiers()!=null) {
-                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "SRS identifier of the output coordinate system:{0}", outCRS.getCoordinateSystem().getIdentifiers().toString());                
-            }
-            if (geom!=null && geom.getUserData()!=null) {
-                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "CRS value read by the geometry of the db:{0}", ((CoordinateReferenceSystem) geom.getUserData()).toString());       
-            }
-            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output Boundind Box:{0}", ""+outBBox);            
+            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output Boundind Box:{0}", "" + outBBox);
             Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.SEVERE, null, ex);
         }
         return geom;
+
     }
 
-    private Geometry offsetCurve(Geometry geometry, double d, BufferParameters parameters, Boolean roughOffsetCurve, Integer qS) {
+    /**
+     * Build the geometry to return from the evaluate filter function
+     * 
+     * @param outBBox
+     * @param geom
+     *            Input geometry
+     * @param offsetPx
+     * @param widthPx
+     * @param endcap
+     * @param join
+     * @param dMode
+     * @param scalingWidth
+     * @param bbox_width_pixel
+     * @param bbox_heigth_pixel
+     * @param quadseg
+     * @return
+     * @throws TransformException
+     * @throws FactoryException
+     * @throws ExecutionException
+     */
+    Geometry buildGeometryToReturn(ReferencedEnvelope outBBox, Geometry geom, double offsetPx, double widthPx, BufferParameters bufferParameters, int maxPixelLengthToDraw, int dMode, int scalingWidth, int bbox_width_pixel, int bbox_heigth_pixel) throws TransformException, FactoryException, ExecutionException {
+
+        // Compute CRS units in one pixel
+        Double crsUnitPerPixel = null;
+
+        double bbox_width_crs = outBBox.getWidth();
+        double bbox_heigth_crs = outBBox.getHeight();
+        if (FluxoFunctionFactory.useCache)
+            crsUnitPerPixel = FluxoFunctionFactory.cache_width.getIfPresent(bbox_width_crs + ";" + bbox_heigth_crs);
+        if (crsUnitPerPixel == null) {
+            crsUnitPerPixel = getCRSUnitInOnePixel(outBBox, bbox_width_pixel, bbox_heigth_pixel);
+            FluxoFunctionFactory.cache_width.put(bbox_width_crs + ";" + bbox_heigth_crs, crsUnitPerPixel);
+        }
+
+        // Transorf the geometry according to the output CRS
+        Geometry geom_transformed = geom;
+        boolean runTransformation = false;
+        MathTransform transform = null;
+        if (!((CoordinateReferenceSystem) geom.getUserData()).equals(outBBox.getCoordinateReferenceSystem())) {
+            runTransformation = true;
+            transform = CRS.findMathTransform((CoordinateReferenceSystem) geom.getUserData(), outBBox.getCoordinateReferenceSystem());
+            geom_transformed = JTS.transform(geom, transform);
+            geom_transformed.setUserData(outBBox.getCoordinateReferenceSystem());
+        }
+
+        // Simplify geometry
+        Geometry geom_simplified = geom_transformed;
+        double xcoo1, ycoo1, xcoo2, ycoo2;
+        double geom_bbox_width, geom_bbox_height;
+        if (geom_transformed.getCoordinates().length > 2) {
+            Envelope envGeom = geom_transformed.getEnvelopeInternal();
+            xcoo1 = envGeom.getMinX();
+            ycoo1 = envGeom.getMinY();
+            xcoo2 = envGeom.getMaxX();
+            ycoo2 = envGeom.getMaxY();
+            geom_bbox_width = envGeom.getWidth();
+            geom_bbox_height = envGeom.getHeight();
+        }
+        else {
+            Coordinate[] coord = geom_transformed.getCoordinates();
+            xcoo1 = coord[0].x;
+            ycoo1 = coord[0].y;
+            xcoo2 = coord[1].x;
+            ycoo2 = coord[1].y;
+            geom_bbox_width = Math.abs(xcoo1 - xcoo2);
+            geom_bbox_height = Math.abs(ycoo1 - ycoo2);
+        }
+        double diag_distance_crs = Math.sqrt(geom_bbox_width * geom_bbox_width + geom_bbox_height * geom_bbox_height);
+        double diag_distance_pixel = diag_distance_crs / crsUnitPerPixel;
+        // check if diagonal length of bounding box of the geometry is minor
+        // than 3 pixel
+        if (diag_distance_pixel < maxPixelLengthToDraw) {// simplify geometry...
+            return null;
+            // geom_simplified=geom.getFactory().createPoint(new
+            // Coordinate(xcoo1, ycoo1));
+            // geom_simplified=geom.getFactory().createLineString(new
+            // Coordinate[]{new Coordinate(xcoo1, ycoo1), new Coordinate(xcoo2,
+            // ycoo2)});
+        }
+
+        if (scalingWidth == 1) {
+            double unitPerPixel=crsUnitPerPixel;
+            if(outBBox.getCoordinateReferenceSystem().getCoordinateSystem().getAxis(0).getUnit().getStandardUnit().toString().equals("rad")){
+                unitPerPixel=crsUnitPerPixel*earthRadiusMeters;
+            }
+            double multiplier=Math.pow(10/unitPerPixel,1.0/12);
+            widthPx=widthPx*multiplier;
+        }
+        
+        double offsetCrs = offsetPx * crsUnitPerPixel;
+        double widthCrs = widthPx * crsUnitPerPixel;
+
+        bufferParameters.setSingleSided(true);
+
+        Geometry geom_offseted = null;
+        // Offset
+        if (dMode == 0) {
+            geom_offseted = offsetCurve(geom_simplified, offsetCrs, bufferParameters, false);
+        }
+        else {
+            geom_offseted = offsetCurve(geom_simplified, -offsetCrs, bufferParameters, false);
+        }
+
+        // Buffer
+        bufferParameters.setSingleSided(false);
+        Geometry geom_buffered = BufferOp.bufferOp(geom_offseted, widthCrs, bufferParameters);
+
+        // Reverse the geometry trasformation returnig to the original CRS
+        Geometry geom_toReturn = geom_buffered;
+        if (runTransformation) {
+            transform = CRS.findMathTransform(outBBox.getCoordinateReferenceSystem(), (CoordinateReferenceSystem) geom.getUserData());
+            geom_toReturn = JTS.transform(geom_buffered, transform);
+            geom_toReturn.setUserData(geom.getUserData());
+        }
+
+        return geom_toReturn;
+    }
+
+    private Geometry offsetCurve(Geometry geometry, double d, BufferParameters parameters, Boolean roughOffsetCurve) throws ExecutionException {
+
+        if (d == 0)
+            return (Geometry) geometry.clone();
+
         GeometryFactory gf = geometry.getFactory();
         // If "geometry" is a surface, process its boundary
         if (geometry.getDimension() == 2) {
             geometry = geometry.getBoundary();
         }
 
-        Collection offsetCurves = new ArrayList();
+        Collection<LineString> offsetCurves = new ArrayList<LineString>();
         if (roughOffsetCurve) {
             addRoughOffsetCurves(offsetCurves, geometry, parameters, d);
-        } else {
-            addCleanOffsetCurves(offsetCurves, geometry, parameters, d, qS);
+        }
+        else {
+            addCleanOffsetCurves(offsetCurves, geometry, parameters, d);
         }
         return gf.buildGeometry(offsetCurves);
     }
 
-    private void addCleanOffsetCurves(Collection offsetCurves, Geometry sourceCurve, BufferParameters parameters, Double offsetDistance, Integer qS) {
-        parameters.setSingleSided(true);
-        parameters.setQuadrantSegments(qS);
-        Geometry sidedBuffer = new BufferOp(sourceCurve, parameters)
-                .getResultGeometry(offsetDistance)
-                .getBoundary();
-        Collection offsetSegments = new ArrayList();
+    private void addCleanOffsetCurves(Collection<LineString> offsetCurves, Geometry sourceCurve, BufferParameters parameters, Double offsetDistance) throws ExecutionException {
+
+        Geometry sidedBuffer = BufferOp.bufferOp(sourceCurve, offsetDistance, parameters).getBoundary();
+
+        Collection<LineString> offsetSegments = new ArrayList<LineString>();
+        double offsetPositiveDistance = Math.abs(offsetDistance);
         // Segments located entirely under this distance are excluded
-        double lowerBound = Math.abs(offsetDistance) * Math.sin(Math.PI / (4 * qS));
+        double lowerBound = offsetPositiveDistance * Math.sin(Math.PI / (4 * parameters.getQuadrantSegments()));
         // Segments located entirely over this distance are included
         // note that the theoretical approximation made with quadrantSegments
-        // is offset*cos(PI/(4*quadrantSegments) but offset*cos(PI/(2*quadrantSegments)
+        // is offset*cos(PI/(4*quadrantSegments) but
+        // offset*cos(PI/(2*quadrantSegments)
         // is used to make sure to include segments located on the boundary
-        double upperBound = Math.abs(offsetDistance) * Math.cos(Math.PI / (2 * qS));
+        double upperBound = offsetPositiveDistance * Math.cos(Math.PI / (2 * parameters.getQuadrantSegments()));
         for (int i = 0; i < sidedBuffer.getNumGeometries(); i++) {
             Coordinate[] cc = sidedBuffer.getGeometryN(i).getCoordinates();
             PointPairDistance ppd = new PointPairDistance();
             DistanceToPoint.computeDistance(sourceCurve, cc[0], ppd);
+
             double dj = ppd.getDistance();
             for (int j = 1; j < cc.length; j++) {
                 double di = dj;
                 ppd = new PointPairDistance();
                 DistanceToPoint.computeDistance(sourceCurve, cc[j], ppd);
                 dj = ppd.getDistance();
-                // segment along or touching the source geometry : eclude it
+                // segment along or touching the source geometry : exclude it
                 if (Math.max(di, dj) < lowerBound || di == 0 || dj == 0) {
                     continue;
                 } // segment along the buffer boundary : include it
                 else if (Math.min(di, dj) > upperBound) {
-                    LineString segment = sourceCurve.getFactory().createLineString(
-                            new Coordinate[]{cc[j - 1], cc[j]});
+                    LineString segment = sourceCurve.getFactory().createLineString(new Coordinate[] { cc[j - 1], cc[j] });
                     offsetSegments.add(segment);
                 } // segment entirely located inside the buffer : exclude it
                 else if (Math.min(di, dj) > lowerBound && Math.max(di, dj) < upperBound) {
                     continue;
                 } // segment with a end at the offset distance and the other
-                // located within the buffer : divide it
+                  // located within the buffer : divide it
                 else {
                     // One of the coordinates is closed to but not on the source
-                    // curve and the other is more or less closed to offset distance
+                    // curve and the other is more or less closed to offset
+                    // distance
                     divide(offsetSegments, sourceCurve, cc[j - 1], cc[j], di, dj, lowerBound, upperBound);
                 }
             }
         }
+
         offsetCurves.addAll(merge(offsetSegments));
     }
 
-    // Recursive function to split segments located on the single-side buffer
-    // boundary, but having a part of them inside the full buffer.
-    private void divide(Collection offsetSegments, Geometry sourceCurve,
-            Coordinate c1, Coordinate c2, double d1, double d2, double lb, double ub) {
+    /**
+     * Recursive function to split segments located on the single-side buffer
+     * boundary, but having a part of them inside the full buffer.
+     */
+    private void divide(Collection<LineString> offsetSegments, Geometry sourceCurve, Coordinate c1, Coordinate c2, double d1, double d2, double lb, double ub) {
+
         // I stop recursion for segment < 2*lb to exclude small segments
         // perpendicular but very close to the boundary
         if (c1.distance(c2) < 2 * lb) {
@@ -308,93 +359,50 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
         PointPairDistance ppd = new PointPairDistance();
         DistanceToPoint.computeDistance(sourceCurve, c, ppd);
         double d = ppd.getDistance();
-        if (Math.max(d1, d) < lb) {
-        } else if (Math.min(d1, d) > lb && Math.max(d1, d) < ub) {
-        } else if (Math.min(d1, d) > ub) {
-            LineString segment = sourceCurve.getFactory().createLineString(
-                    new Coordinate[]{c1, c});
+        if (Math.max(d1, d) < lb) {}
+        else if (Math.min(d1, d) > lb && Math.max(d1, d) < ub) {}
+        else if (Math.min(d1, d) > ub) {
+            LineString segment = sourceCurve.getFactory().createLineString(new Coordinate[] { c1, c });
             offsetSegments.add(segment);
-        } else {
+        }
+        else {
             divide(offsetSegments, sourceCurve, c1, c, d1, d, lb, ub);
         }
-        if (Math.max(d, d2) < lb) {
-        } else if (Math.min(d, d2) > lb && Math.max(d, d2) < ub) {
-        } else if (Math.min(d, d2) > ub) {
-            LineString segment = sourceCurve.getFactory().createLineString(
-                    new Coordinate[]{c, c2});
+        if (Math.max(d, d2) < lb) {}
+        else if (Math.min(d, d2) > lb && Math.max(d, d2) < ub) {}
+        else if (Math.min(d, d2) > ub) {
+            LineString segment = sourceCurve.getFactory().createLineString(new Coordinate[] { c, c2 });
             offsetSegments.add(segment);
-        } else {
+        }
+        else {
             divide(offsetSegments, sourceCurve, c, c2, d, d2, lb, ub);
         }
     }
 
-    private void addRoughOffsetCurves(Collection offsetCurves, Geometry sourceCurve, BufferParameters parameters, Double offsetDistance) {
+    private void addRoughOffsetCurves(Collection<LineString> offsetCurves, Geometry sourceCurve, BufferParameters parameters, Double offsetDistance) {
 
-        OffsetCurveBuilder builder = new OffsetCurveBuilder(
-                sourceCurve.getFactory().getPrecisionModel(), parameters);
+        OffsetCurveBuilder builder = new OffsetCurveBuilder(sourceCurve.getFactory().getPrecisionModel(), parameters);
 
         for (int i = 0; i < sourceCurve.getNumGeometries(); i++) {
             if (sourceCurve.getGeometryN(i) instanceof LineString) {
                 LineString lineString = (LineString) sourceCurve.getGeometryN(i);
                 Coordinate[] cc = lineString.getCoordinates();
                 if (lineString.isClosed()) {
-                    offsetCurves.add(lineString.getFactory().createLineString(
-                            builder.getRingCurve(cc,
-                            offsetDistance > 0 ? Position.LEFT : Position.RIGHT,
-                            Math.abs(offsetDistance))));
-                } else {
-                    offsetCurves.add(lineString.getFactory().createLineString(
-                            builder.getOffsetCurve(cc, offsetDistance)));
+                    offsetCurves.add(lineString.getFactory().createLineString(builder.getRingCurve(cc, offsetDistance > 0 ? Position.LEFT : Position.RIGHT, Math.abs(offsetDistance))));
+                }
+                else {
+                    offsetCurves.add(lineString.getFactory().createLineString(builder.getOffsetCurve(cc, offsetDistance)));
                 }
             }
         }
     }
 
-    private Collection merge(Collection linestrings) {
+    @SuppressWarnings("unchecked")
+    private Collection<LineString> merge(Collection<LineString> linestrings) {
+
         LineMerger merger = new LineMerger();
         merger.add(linestrings);
         return merger.getMergedLineStrings();
-    }
-
-    /**
-     * Returns a buffered geometry with old shapes in the center of new ones. If
-     * the buffer is issued at single side then a negative offset renders the
-     * shape on the left while a positive offset on the right
-     */
-    public static Geometry bufferWithParams(Geometry geometry, Double offset, Boolean singleSided, Integer quadrantSegments, Integer capStyle, Integer joinStyle, Double mitreLimit, Integer scalingWidth, double pixelPerMeter) {
-        double d = 0.0D;
-        if (offset != null) {
-            double width = offset.doubleValue();
-            if (scalingWidth == SCALING) {
-                d = width * (width/2) * (Math.sqrt(pixelPerMeter));
-            } else {
-                d = width;
-            }
-        }
-        Boolean ss = false;
-        if (singleSided != null) {
-            ss = singleSided;
-        }
-
-        BufferParameters bufferparameters = new BufferParameters();
-
-        //Custom code to be able to draw only on the side of the offset curve
-        bufferparameters.setSingleSided(ss);
-
-        if (quadrantSegments != null) {
-            bufferparameters.setQuadrantSegments(quadrantSegments.intValue());
-        }
-        if (capStyle != null) {
-            bufferparameters.setEndCapStyle(capStyle.intValue());
-        }
-        if (joinStyle != null) {
-            bufferparameters.setJoinStyle(joinStyle.intValue());
-        }
-        if (mitreLimit != null) {
-            bufferparameters.setMitreLimit(mitreLimit.doubleValue());
-        }
-
-        return BufferOp.bufferOp(geometry, d, bufferparameters);
     }
 
     /**
@@ -404,110 +412,22 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements
      */
     @Override
     public ReferencedEnvelope invert(ReferencedEnvelope renderingEnvelope) {
+
         Envelope bufferedEnvelope = JTS.toGeometry((Envelope) renderingEnvelope).getEnvelopeInternal();
         return new ReferencedEnvelope(bufferedEnvelope, renderingEnvelope.getCoordinateReferenceSystem());
     }
 
-    private double distanceInCrs(double inMeters, Geometry geom, CoordinateReferenceSystem crs) {
-        try {
-            double[] refXY = {
-                geom.getCentroid().getCoordinates()[0].x,
-                geom.getCentroid().getCoordinates()[0].y
-            };
-            return distanceInCrs(inMeters, refXY, crs);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return 0d;
-    }
-
-    private double distanceInCrs(double inMeters,
-            double[] refXY,
-            CoordinateReferenceSystem crs) throws TransformException {
-        double dist = 0;
-
-        // calculate the distance in meters of 0.01 * refY in the ref CRS
-        double[] sp = {refXY[0], refXY[1]};
-        double[] dp = {refXY[0], refXY[1] * 1.01};
-
-        GeodeticCalculator gc = new GeodeticCalculator(crs);
-
-        gc.setStartingPosition(new DirectPosition2D(crs, sp[0], sp[1]));
-        gc.setDestinationPosition(new DirectPosition2D(crs, dp[0], dp[1]));
-
-        double refY01InMeters = gc.getOrthodromicDistance();
-
-        // now, calculate the CRS distance as a proportional of 0.01 * refY
-        dist = inMeters * (refXY[1] * 0.01) / refY01InMeters;
-
-        return dist;
-    }
-
-    private double pixelToMeter(ReferencedEnvelope outputEnv, int outputWidth, int outputHeight, double pixel_distance) {
-        double pixel_distance_m;
-        double pixel_diag_distance;
-        double pixel_diag_distance_m;
-
-        pixel_diag_distance = Math.sqrt((outputWidth * outputWidth)
-                + (outputHeight * outputHeight));
-        pixel_diag_distance_m = getGeodeticSegmentLength(outputEnv.getMinX(), outputEnv.getMinY(), outputEnv.getMaxX(), outputEnv.getMaxY());
-        pixel_distance_m = pixel_diag_distance_m * pixel_distance / pixel_diag_distance;
-        return pixel_distance_m;
-
-    }
-
-    private static double getGeodeticSegmentLength(double minx, double miny, double maxx, double maxy) {
-        final GeodeticCalculator calculator = new GeodeticCalculator(DefaultGeographicCRS.WGS84);
-        double rminx = rollLongitude(minx);
-        double rminy = rollLatitude(miny);
-        double rmaxx = rollLongitude(maxx);
-        double rmaxy = rollLatitude(maxy);
-        calculator.setStartingGeographicPoint(rminx, rminy);
-        calculator.setDestinationGeographicPoint(rmaxx, rmaxy);
-        return calculator.getOrthodromicDistance();
-    }
-
-    protected static double rollLongitude(final double x) {
-        double rolled = x - (((int) (x + Math.signum(x) * 180)) / 360) * 360.0;
-        return rolled;
-    }
-
-    protected static double rollLatitude(final double x) {
-        double rolled = x - (((int) (x + Math.signum(x) * 90)) / 180) * 180.0;
-        return rolled;
-    }
-
     /**
-     * Returns a geometry based on the transformation from a source geometry CRS
-     * to a defined target CRS.
-     *
+     * 
+     * @param bbox_crs
+     * @param bbox_width_pixel
+     * @param bbox_heigth_pixel
+     * @return
      */
-    private Geometry transfGeom(Geometry g, CoordinateReferenceSystem outputCRS) throws TransformException, NoSuchAuthorityCodeException, FactoryException {
+    private double getCRSUnitInOnePixel(ReferencedEnvelope bbox_crs, int bbox_width_pixel, int bbox_heigth_pixel) {
 
-        Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
-        CRSAuthorityFactory factory = ReferencingFactoryFinder.getCRSAuthorityFactory("EPSG", hints);
-        CoordinateReferenceSystem srcCRS = factory.createCoordinateReferenceSystem("EPSG:4326");
-
-        outputCRS = factory.createCoordinateReferenceSystem("EPSG:900913");
-
-        MathTransform transform;
-        transform = CRS.findMathTransform(srcCRS, outputCRS, false);
-        Geometry trgGeom = JTS.transform(g, transform);
-
-        return trgGeom;
-    }
-
-    private ReferencedEnvelope transfEnvelope(ReferencedEnvelope re, CoordinateReferenceSystem targetCRS) throws TransformException, FactoryException {
-        ReferencedEnvelope result = null;
-        result = re.transform(targetCRS, true, 10);
-        return result;
-    }
-
-    private Boolean doTravelLeft(Integer i) {
-        if (i == 1) {
-            return true;
-        } else {
-            return false;
-        }
+        double diag_distance_pixel = Math.sqrt((bbox_width_pixel * bbox_width_pixel) + (bbox_heigth_pixel * bbox_heigth_pixel));
+        double diag_distance_CRS = Math.sqrt((bbox_crs.getWidth() * bbox_crs.getWidth()) + (bbox_crs.getHeight() * bbox_crs.getHeight()));
+        return diag_distance_CRS / diag_distance_pixel;
     }
 }
