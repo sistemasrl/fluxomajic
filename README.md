@@ -85,7 +85,7 @@ Fluxomajic adds a function "fluxo" that can be used in SLD. Here is an example o
             <ogc:Literal>1</ogc:Literal>              <!-- JOIN style;   1 = ROUND(default),
                                                                          2 = MITRE,
                                                                          3 = BEVEL -->
-            <ogc:Literal>0</ogc:Literal>              <!-- Scaling Width (if the width has to scale
+            <ogc:Literal>2</ogc:Literal>              <!-- Scaling Width (if the width has to scale
                                                            according to zoom level);
                                                                          1 = YES(default),
                                                                          2 = NO -->
