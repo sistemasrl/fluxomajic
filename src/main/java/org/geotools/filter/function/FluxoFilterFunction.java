@@ -113,8 +113,7 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
 
             Integer scalingWidth = getExpression(7).evaluate(feature, Integer.class);
 
-            int maxPixelLengthToDraw = 3;// getExpression(8).evaluate(feature,
-                                         // Integer.class);
+            int maxPixelLengthToDraw = getExpression(8).evaluate(feature,Integer.class);
 
             outCRS = getExpression(9).evaluate(feature, CoordinateReferenceSystem.class);
 
@@ -202,37 +201,40 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
 
         // Simplify geometry
         Geometry geom_simplified = geom_transformed;
-        double xcoo1, ycoo1, xcoo2, ycoo2;
-        double geom_bbox_width, geom_bbox_height;
-        if (geom_transformed.getCoordinates().length > 2) {
-            Envelope envGeom = geom_transformed.getEnvelopeInternal();
-            xcoo1 = envGeom.getMinX();
-            ycoo1 = envGeom.getMinY();
-            xcoo2 = envGeom.getMaxX();
-            ycoo2 = envGeom.getMaxY();
-            geom_bbox_width = envGeom.getWidth();
-            geom_bbox_height = envGeom.getHeight();
-        }
-        else {
-            Coordinate[] coord = geom_transformed.getCoordinates();
-            xcoo1 = coord[0].x;
-            ycoo1 = coord[0].y;
-            xcoo2 = coord[1].x;
-            ycoo2 = coord[1].y;
-            geom_bbox_width = Math.abs(xcoo1 - xcoo2);
-            geom_bbox_height = Math.abs(ycoo1 - ycoo2);
-        }
-        double diag_distance_crs = Math.sqrt(geom_bbox_width * geom_bbox_width + geom_bbox_height * geom_bbox_height);
-        double diag_distance_pixel = diag_distance_crs / crsUnitPerPixel;
-        // check if diagonal length of bounding box of the geometry is minor
-        // than 3 pixel
-        if (diag_distance_pixel < maxPixelLengthToDraw) {// simplify geometry...
-            return null;
-            // geom_simplified=geom.getFactory().createPoint(new
-            // Coordinate(xcoo1, ycoo1));
-            // geom_simplified=geom.getFactory().createLineString(new
-            // Coordinate[]{new Coordinate(xcoo1, ycoo1), new Coordinate(xcoo2,
-            // ycoo2)});
+        if(maxPixelLengthToDraw>0){
+            double xcoo1, ycoo1, xcoo2, ycoo2;
+            double geom_bbox_width, geom_bbox_height;
+            if (geom_transformed.getCoordinates().length > 2) {
+                Envelope envGeom = geom_transformed.getEnvelopeInternal();
+                xcoo1 = envGeom.getMinX();
+                ycoo1 = envGeom.getMinY();
+                xcoo2 = envGeom.getMaxX();
+                ycoo2 = envGeom.getMaxY();
+                geom_bbox_width = envGeom.getWidth();
+                geom_bbox_height = envGeom.getHeight();
+            }
+            else {
+                Coordinate[] coord = geom_transformed.getCoordinates();
+                xcoo1 = coord[0].x;
+                ycoo1 = coord[0].y;
+                xcoo2 = coord[1].x;
+                ycoo2 = coord[1].y;
+                geom_bbox_width = Math.abs(xcoo1 - xcoo2);
+                geom_bbox_height = Math.abs(ycoo1 - ycoo2);
+            }
+            double diag_distance_crs = Math.sqrt(geom_bbox_width * geom_bbox_width + geom_bbox_height * geom_bbox_height);
+            double diag_distance_pixel = diag_distance_crs / crsUnitPerPixel;
+            // check if diagonal length of bounding box of the geometry is minor
+            // than 3 pixel
+            if (diag_distance_pixel < maxPixelLengthToDraw) {// simplify geometry...
+                return null;
+                // geom_simplified=geom.getFactory().createPoint(new
+                // Coordinate(xcoo1, ycoo1));
+                // geom_simplified=geom.getFactory().createLineString(new
+                // Coordinate[]{new Coordinate(xcoo1, ycoo1), new Coordinate(xcoo2,
+                // ycoo2)});
+            }
+            
         }
 
         if (scalingWidth == 1) {
@@ -252,10 +254,10 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
         Geometry geom_offseted = null;
         // Offset
         if (dMode == 0) {
-            geom_offseted = offsetCurve(geom_simplified, offsetCrs, bufferParameters, false);
+            geom_offseted = offsetCurve(geom_simplified, -offsetCrs, bufferParameters, false);//right side
         }
         else {
-            geom_offseted = offsetCurve(geom_simplified, -offsetCrs, bufferParameters, false);
+            geom_offseted = offsetCurve(geom_simplified, offsetCrs, bufferParameters, false);//left side
         }
 
         // Buffer
