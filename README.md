@@ -89,7 +89,7 @@ Fluxomajic adds a function "fluxo" that can be used in SLD. Here is an example o
                                                            according to zoom level);
                                                                          1 = YES(default),
                                                                          2 = NO -->
-            <ogc:Literal>3</ogc:Literal>            <!-- Minimum length (ni pixel) of the diagonal 
+            <ogc:Literal>3</ogc:Literal>            <!-- Minimum length (in pixel) of the diagonal 
                                                       of the bounding box of the single geometry
                                                       to run the drawn process;  3(default) -->
             <ogc:Function name="env">                 <!-- envs (fixed and mandatory) -->
