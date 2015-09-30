@@ -32,7 +32,6 @@ import org.geotools.filter.FunctionExpressionImpl;
 import org.geotools.filter.capability.FunctionNameImpl;
 import org.opengis.filter.capability.FunctionName;
 
-import com.vividsolutions.jts.geom.CoordinateSequence;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LineString;
@@ -49,12 +48,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
-import org.geotools.referencing.GeodeticCalculator;
-import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.opengis.filter.expression.Expression;
 import org.opengis.filter.expression.Literal;
 import org.opengis.referencing.FactoryException;
@@ -140,14 +136,6 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
             return buildGeometryToReturn(outBBox, geom, offsetPx, widthPx, bufferParameters, maxPixelLengthToDraw, dMode, scalingWidth, wmsWidth, wmsHeight);
         }
         catch (Exception ex) {
-            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output CRS:{0}", "" + outCRS);
-            if (outCRS != null && outCRS.getCoordinateSystem() != null && outCRS.getCoordinateSystem().getIdentifiers() != null) {
-                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "SRS identifier of the output coordinate system:{0}", outCRS.getCoordinateSystem().getIdentifiers().toString());
-            }
-            if (geom != null && geom.getUserData() != null) {
-                Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "CRS value read by the geometry of the db:{0}", ((CoordinateReferenceSystem) geom.getUserData()).toString());
-            }
-            Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.INFO, "Output Boundind Box:{0}", "" + outBBox);
             Logger.getLogger(FluxoFilterFunction.class.getName()).log(Level.SEVERE, null, ex);
         }
         return geom;
