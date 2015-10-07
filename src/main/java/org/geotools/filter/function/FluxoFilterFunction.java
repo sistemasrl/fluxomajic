@@ -90,6 +90,8 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
 
         Geometry geom = null;
 
+        @SuppressWarnings("unused")
+        CoordinateReferenceSystem outCRS = null;
         ReferencedEnvelope outBBox = null;
         try {
             geom = getExpression(0).evaluate(feature, Geometry.class);
@@ -109,6 +111,8 @@ public class FluxoFilterFunction extends FunctionExpressionImpl implements Geome
             Integer scalingWidth = getExpression(7).evaluate(feature, Integer.class);
 
             int maxPixelLengthToDraw = getExpression(8).evaluate(feature,Integer.class);
+
+            outCRS = getExpression(9).evaluate(feature, CoordinateReferenceSystem.class);
 
             Integer wmsWidth = getExpression(10).evaluate(feature, Integer.class);
 
