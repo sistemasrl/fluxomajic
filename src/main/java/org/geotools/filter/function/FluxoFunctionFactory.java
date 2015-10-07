@@ -25,8 +25,6 @@ import org.geotools.filter.function.FluxoFilterFunction;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.List;
 
 import org.geotools.feature.NameImpl;
@@ -39,12 +37,6 @@ import org.opengis.filter.expression.Literal;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.io.WKBReader;
-import com.vividsolutions.jts.io.WKBWriter;
-import com.vividsolutions.jts.io.WKTWriter;
-import com.vividsolutions.jts.operation.buffer.BufferOp;
 
 public class FluxoFunctionFactory implements FunctionFactory {
 
